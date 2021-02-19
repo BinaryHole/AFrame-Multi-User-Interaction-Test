@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>AFrame Multiplayer Experience</title>
+
+    <!-- Imports -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://aframe.io/releases/1.1.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-environment-component@1.1.0/dist/aframe-environment-component.min.js"></script>
+  </head>
+  <body>
+    <!-- socket.io script -->
+    <script>
+      var name = '';
+      const socket = io();
+
+      // called when the player changes their name
+      setName = (newName) => {
+        name = newName;
+        socket.emit('setName', name);
+      }
+
+      socket.on('usersChanged', (users) => {
+        var userListDiv = document.querySelector('.user-list');
+        console.log(users);
+      });
+
+      getPosition = (component) => {
+        return new THREE.Vector3(
+          component.el.getAttribute('position').x,
+          component.el.getAttribute('position').y,
+          component.el.getAttribute('position').z
+        );
+      }
+
+      // Aframe components
+      AFRAME.registerComponent('player', {
+        init: function() {
+          // set up initial vars
+          this.lastPosition = getPosition(this);
+          console.log(this.lastPosition);
+        },
+
+        tick: function() {
+          this.hasMoved();
+          var newPosition = getPosition(this);
+          if (this.hasMoved(0.5)) {
+            console.log('Moved!');
+            socket.emit('moved', [newPosition.x, newPosition.y, newPosition.z]);
+          }
+        },
+
+        hasMoved: function(threshold) {
+          var newPosition = getPosition(this);
+
+          // check if the player has moved more than the threshold
+          if (this.lastPosition.distanceTo(newPosition) > threshold) {
+            this.lastPosition = newPosition;
+            return true;
+          } else {
+            return false;
+          }
+        }
+      });
+    </script>
+
+    <a-scene>
+      <a-camera player></a-camera>
+
+      <a-entity environment='preset: checkerboard; dressing: none'></a-entity>
+    </a-scene>
+  </body>
+</html>
