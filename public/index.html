@@ -13,19 +13,54 @@
     <!-- socket.io script -->
     <script>
       var name = '';
-      const socket = io();
+      const socket = io({transports: ['websocket'], upgrade: false});
 
       // called when the player changes their name
-      setName = (newName) => {
-        name = newName;
-        socket.emit('setName', name);
+      setName = (data) => {
+        name = data.newName;
+        socket.emit('setName', {name: data.newName});
       }
 
-      socket.on('usersChanged', (users) => {
-        var userListDiv = document.querySelector('.user-list');
-        console.log(users);
+      // emitted to update the position of all players on the client
+      socket.on('updatePlayers', (data) => {
+        // get the players-controller
+        var playersController = document.querySelector('[players-controller]');
+
+        // loop through each player in the data list
+        for (var i = 0; i < data.players.length; i++) {
+          // update the current player from the list
+          playersController.emit('updatePlayer', {player: data.players[i]});
+        }
       });
 
+      // emitted at the beginning to get all currently connected players
+      socket.on('spawnInitialPlayers', (data) => {
+        // get the players-controller
+        var playersController = document.querySelector('[players-controller]');
+
+        // loop through each player in the data list
+        for (var i = 0; i < data.players.length; i++) {
+          // make sure the current player is not ourself
+          if (data.players[i].id != socket.id) {
+            // add the connected player from the list
+            playersController.emit('addPlayer', {player: data.players[i]});
+          }
+        }
+      });
+
+      // emitted to add a new player on the client side
+      socket.on('playerJoined', (data) => {
+        document.querySelector('[players-controller]').emit(
+          'addPlayer', {player: data.player});
+      });
+
+      // emitted to remove a player on the client side
+      socket.on('playerQuit', (data) => {
+        document.querySelector('[players-controller]').emit(
+          'removePlayer', {playerId: data.playerId});
+      });
+
+      // allows for easily getting position as a THREE vector3
       getPosition = (component) => {
         return new THREE.Vector3(
           component.el.getAttribute('position').x,
@@ -34,20 +69,25 @@
         );
       }
 
-      // Aframe components
+      // The Player component
       AFRAME.registerComponent('player', {
+        schema: {
+          moveThreshold: {type:'number', default: 0.1}
+        },
         init: function() {
           // set up initial vars
           this.lastPosition = getPosition(this);
-          console.log(this.lastPosition);
         },
 
         tick: function() {
           this.hasMoved();
           var newPosition = getPosition(this);
-          if (this.hasMoved(0.5)) {
-            console.log('Moved!');
-            socket.emit('moved', [newPosition.x, newPosition.y, newPosition.z]);
+
+          // check if the player has moved more than the threshold amount
+          if (this.hasMoved(this.data.moveThreshold)) {
+            // emit a moved event to the server with the new position
+            socket.emit('moved', {newPosition:
+              {x: newPosition.x, y: newPosition.y, z: newPosition.z}});
           }
         },
 
@@ -63,12 +103,86 @@
           }
         }
       });
+
+      // The PlayerController component
+      AFRAME.registerComponent('players-controller', {
+        init: function () {
+          var el = this.el;
+
+          el.addEventListener('updatePlayer', function (data) {
+            // get each spawned player
+            var spawnedPlayers = document.querySelectorAll('[other-player]');
+
+            // loop through each spawned player
+            for (var i = 0; i < spawnedPlayers.length; i++) {
+              // check if the current spawned player should be updated (by id)
+              if (spawnedPlayers[i].getAttribute('id') == data.detail.player.id) {
+                // update the position of the player
+                spawnedPlayers[i].setAttribute('position', data.detail.player.position);
+              }
+            }
+          });
+          el.addEventListener('addPlayer', function (data) {
+            // create a new entity element
+            playerEl = document.createElement('a-entity');
+
+            // setup the attributes of the new player element
+            playerEl.setAttribute('other-player',
+              {name: data.detail.player.name});
+            playerEl.setAttribute('id', data.detail.player.id);
+            playerEl.setAttribute('position', data.detail.player.position);
+
+            console.log('Player ' + playerEl.getAttribute('id') + ' added.');
+
+            // append the new player element to the players-controller element
+            el.appendChild(playerEl);
+          });
+          el.addEventListener('removePlayer', function (data) {
+            // get each spawned player
+            var spawnedPlayers = document.querySelectorAll('[other-player]');
+
+            // loop through each spawned player
+            for (let i = 0; i < spawnedPlayers.length; i++) {
+              // check if the current spawned player should be removed (by id)
+              if (spawnedPlayers[i].getAttribute('id') == data.detail.playerId) {
+                console.log('Player ' + spawnedPlayers[i].getAttribute('id')
+                  + ' removed.');
+
+                // remove the spawned player
+                spawnedPlayers[i].parentNode.removeChild(spawnedPlayers[i]);
+              }
+            }
+          });
+        }
+      });
+
+      // the OtherPlayer component
+      AFRAME.registerComponent('other-player', {
+        schema: {
+          name: {type: 'string', default: ''},
+          color: {type: 'color', default: '#329ea8'}
+        },
+        init: function () {
+          var data  = this.data;
+          var el    = this.el;
+
+          // create the geometry
+          this.geometry = new THREE.BoxBufferGeometry(1, 1.6, 1);
+          this.material = new THREE.MeshStandardMaterial({color: data.color});
+          this.mesh     = new THREE.Mesh(this.geometry, this.material);
+
+          // Set the mesh on the entity
+          el.setObject3D('mesh', this.mesh);
+        }
+      });
     </script>
 
     <a-scene>
       <a-camera player></a-camera>
-
+      <a-entity players-controller>
+      </a-entity>
       <a-entity environment='preset: checkerboard; dressing: none'></a-entity>
+      <!-- <a-entity environment='preset: forest'></a-entity> -->
     </a-scene>
   </body>
 </html>
