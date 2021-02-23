@@ -21,6 +21,10 @@
         socket.emit('setName', {name: data.newName});
       }
 
+      // emitted when the player connects
+      socket.on('connect', () => {
+      });
+
       // emitted to update the position of all players on the client
       socket.on('updatePlayers', (data) => {
         // get the players-controller
@@ -60,43 +64,74 @@
           'removePlayer', {playerId: data.playerId});
       });
 
+      // Creates a random hex color
+      const randomColor = () => {
+        return('#' + Math.floor(Math.random() * 16777215).toString(16));
+      }
+
       // allows for easily getting position as a THREE vector3
-      getPosition = (component) => {
-        return new THREE.Vector3(
-          component.el.getAttribute('position').x,
-          component.el.getAttribute('position').y,
-          component.el.getAttribute('position').z
-        );
+      const getPosition = (element) => {
+        return element.object3D.getWorldPosition(new THREE.Vector3())
+          .clone();
+      }
+
+      // allows for easily getting a rotation as a THREE quat
+      const getRotation = (element) => {
+        return element.object3D.getWorldQuaternion(new THREE.Quaternion())
+          .clone();
       }
 
       // The Player component
       AFRAME.registerComponent('player', {
         schema: {
-          moveThreshold: {type:'number', default: 0.1}
+          moveThreshold: {type:'number', default: 0.1},
+          rotationThreshold: {type: 'number', default: 0.1}
         },
         init: function() {
+          this.ship = this.el.querySelector('.ship');
+
           // set up initial vars
-          this.lastPosition = getPosition(this);
+          this.lastPosition = getPosition(this.ship);
+          this.lastRotation = getRotation(this.ship);
         },
 
         tick: function() {
-          this.hasMoved();
-          var newPosition = getPosition(this);
+          var newPosition = getPosition(this.ship);
+          var newRotation = getRotation(this.ship);
 
           // check if the player has moved more than the threshold amount
-          if (this.hasMoved(this.data.moveThreshold)) {
+          if (this.hasMoved(newPosition) || this.hasRotated(newRotation)) {
             // emit a moved event to the server with the new position
-            socket.emit('moved', {newPosition:
-              {x: newPosition.x, y: newPosition.y, z: newPosition.z}});
+            socket.emit('moved', {
+              newPosition:
+              {x: newPosition.x, y: newPosition.y, z: newPosition.z},
+              newRotation:
+              {x: newRotation.x, y: newRotation.y, z: newRotation.z,
+                w: newRotation.w}});
           }
         },
 
-        hasMoved: function(threshold) {
-          var newPosition = getPosition(this);
-
+        hasMoved: function(newPosition) {
           // check if the player has moved more than the threshold
-          if (this.lastPosition.distanceTo(newPosition) > threshold) {
+          if (this.lastPosition.distanceTo(newPosition) >
+            this.data.moveThreshold)
+          {
+            // console.log('Moved!');
             this.lastPosition = newPosition;
+            return true;
+          } else {
+            return false;
+          }
+        },
+
+        hasRotated: function(newRotation) {
+          // check if the player has rotated more than the threshold
+          if (Math.abs(
+            THREE.MathUtils.radToDeg(this.lastRotation.angleTo(newRotation))) >
+            this.data.rotationThreshold)
+          {
+            // console.log('Rotated!');
+            this.lastRotation = newRotation;
             return true;
           } else {
             return false;
@@ -116,27 +151,53 @@
             // loop through each spawned player
             for (var i = 0; i < spawnedPlayers.length; i++) {
               // check if the current spawned player should be updated (by id)
-              if (spawnedPlayers[i].getAttribute('id') == data.detail.player.id) {
+              if (spawnedPlayers[i].getAttribute('id') ==
+                data.detail.player.id)
+              {
                 // update the position of the player
-                spawnedPlayers[i].setAttribute('position', data.detail.player.position);
+                spawnedPlayers[i].setAttribute('position',
+                  data.detail.player.position);
+
+                // update the rotatino of the player
+                spawnedPlayers[i].object3D.quaternion.set(
+                  data.detail.player.rotation.x,
+                  data.detail.player.rotation.y,
+                  data.detail.player.rotation.z,
+                  data.detail.player.rotation.w
+                )
+
+                // update the other-player data of the player
+                spawnedPlayers[i].setAttribute('other-player', {
+                  name: data.detail.player.name
+                });
               }
             }
           });
+
           el.addEventListener('addPlayer', function (data) {
             // create a new entity element
             playerEl = document.createElement('a-entity');
 
             // setup the attributes of the new player element
-            playerEl.setAttribute('other-player',
-              {name: data.detail.player.name});
+            playerEl.setAttribute('other-player', {
+              name: data.detail.player.name
+            });
             playerEl.setAttribute('id', data.detail.player.id);
             playerEl.setAttribute('position', data.detail.player.position);
+
+            playerEl.object3D.quaternion.set(
+              data.detail.player.rotation.x,
+              data.detail.player.rotation.y,
+              data.detail.player.rotation.z,
+              data.detail.player.rotation.w
+            )
 
             console.log('Player ' + playerEl.getAttribute('id') + ' added.');
 
             // append the new player element to the players-controller element
             el.appendChild(playerEl);
           });
+
           el.addEventListener('removePlayer', function (data) {
             // get each spawned player
             var spawnedPlayers = document.querySelectorAll('[other-player]');
@@ -144,7 +205,9 @@
             // loop through each spawned player
             for (let i = 0; i < spawnedPlayers.length; i++) {
               // check if the current spawned player should be removed (by id)
-              if (spawnedPlayers[i].getAttribute('id') == data.detail.playerId) {
+              if (spawnedPlayers[i].getAttribute('id') ==
+                data.detail.playerId)
+              {
                 console.log('Player ' + spawnedPlayers[i].getAttribute('id')
                   + ' removed.');
 
@@ -160,29 +223,67 @@
       AFRAME.registerComponent('other-player', {
         schema: {
           name: {type: 'string', default: ''},
-          color: {type: 'color', default: '#329ea8'}
+          color: {type: 'color', default: 'blue'}
         },
         init: function () {
-          var data  = this.data;
-          var el    = this.el;
+          this.el.setAttribute('geometry', {
+            primitive: 'cone',
+            radiusBottom: 0.7,
+            radiusTop: 0.1,
+            height: 1.5
+          });
+          this.el.setAttribute('rotation', {
+            x: -90,
+            y: 0,
+            z: 0
+          })
+          this.el.setAttribute('material', {
+            color: this.data.color
+          });
+        }
+      });
 
-          // create the geometry
-          this.geometry = new THREE.BoxBufferGeometry(1, 1.6, 1);
-          this.material = new THREE.MeshStandardMaterial({color: data.color});
-          this.mesh     = new THREE.Mesh(this.geometry, this.material);
+      // used to modify the material of a model/mesh
+      AFRAME.registerComponent('modify-material', {
+        schema: {
+          color: {type: 'color', default: '#fff'}
+        },
+        init: function () {
+          this.el.addEventListener('model-loaded', () => {
+            // get the mesh
+            const obj = this.el.getObject3D('mesh');
 
-          // Set the mesh on the entity
-          el.setObject3D('mesh', this.mesh);
+            // change the material color
+            obj.traverse(node => {
+              console.log(this.data.color);
+              node.material.color.set(this.data.color);
+            });
+          });
         }
       });
     </script>
 
     <a-scene>
-      <a-camera player></a-camera>
-      <a-entity players-controller>
+      <a-assets>
+        <a-asset-item id='spaceship' src='/assets/DS3_A3_Spaceship.glb'>
+        </a-asset-item>
+        <img id='space' src='/assets/hdri.png'></img>
+      </a-assets>
+
+      <a-sky src='#space'></a-sky>
+
+      <a-entity wasd-controls='fly:true' look-controls player>
+        <a-cone class='ship'
+          color='#2d5aae'
+          radius-bottom='0.7'
+          radius-top='0.1'
+          height='1.5'
+          rotation='-90 0 0'
+        ></a-cone>
+        <a-entity camera position='0 2 5'></a-entity>
       </a-entity>
-      <a-entity environment='preset: checkerboard; dressing: none'></a-entity>
-      <!-- <a-entity environment='preset: forest'></a-entity> -->
+      <a-entity players-controller></a-entity>
+      <!-- <a-entity environment='ground: none; skyType: none'></a-entity> -->
     </a-scene>
   </body>
 </html>

@@ -28,29 +28,46 @@ io.on('connection', socket => {
     onDisconnect(socket);
   });
 
-  // when the player moves
+  // when the player moves or rotates
   socket.on('moved', (data) => {
-    // loop through each player in the list
-    for (var i = 0; i < players.length; i++) {
-      // if this is the player that has moved (the socket)
-      if (players[i].id == socket.id) {
-        // update the position of the player
-        players[i].position = data.newPosition;
+    // get the index of the player that moved/rotated
+    const playerIndex = getPlayerIndex(socket.id);
 
-        console.log('Player\t%s moved, new position:\t%s',
-          players[i].id, players[i].position);
+    // update the position and rotation of the player
+    players[playerIndex].position = data.newPosition;
+    players[playerIndex].rotation = data.newRotation;
 
-        // emit the updatePlayers socket event
-        socket.broadcast.emit('updatePlayers', {players: players});
-      }
-    }
+    // console.log('Player\t%s moved, position:\t%s, rotation:\t%s',
+    //   players[playerIndex].id, players[playerIndex].position,
+    //   players[playerIndex].rotation);
+
+    // emit the updatePlayers socket event
+    socket.broadcast.emit('updatePlayers', {players: players});
   });
 });
 
+// used to get a player from the database given an id
+const getPlayerIndex = (id) => {
+  // loop through each player in the database
+  for (var i = 0; i < players.length; i++) {
+    if (players[i].id == id) {
+      return i;
+    }
+  }
+}
+
 // called when a new client connects
-onConnect = (socket) => {
+const onConnect = (socket) => {
+  // create the new player object
+  var newPlayer = {
+    id: socket.id,
+    name: '',
+    position: {x:0, y:0, z:0},
+    rotation: {x:0, y:0, z:0, w:0}
+  };
+
   // add the new client id to the list of connections
-  players.push({id: socket.id, name: '', position: {x:0, y:0, z:0}});
+  players.push(newPlayer);
 
   // log which player was added and the list of players
   console.log('Connection ' + socket.id + ' added. \t\t# of connections: '
@@ -61,12 +78,11 @@ onConnect = (socket) => {
   socket.emit('spawnInitialPlayers', {players: players});
 
   // invoke the playerJoined event to all other socket
-  socket.broadcast.emit('playerJoined', {player:
-    {id: socket.id, name: '', position: [0, 0, 0]}});
+  socket.broadcast.emit('playerJoined', {player: newPlayer});
 }
 
 // called when a client disconnects
-onDisconnect = (socket) => {
+const onDisconnect = (socket) => {
   // remove the client's id from the list of connections
   for (var i = 0; i < players.length; i++) {
     if (players[i].id == socket.id) {
@@ -82,5 +98,4 @@ onDisconnect = (socket) => {
       io.emit('playerQuit', {playerId: socket.id});
     }
   }
-
 }
