@@ -77,6 +77,8 @@ const onConnect = (socket) => {
   // invoke the spawnInitialPlayers event this socket
   socket.emit('spawnInitialPlayers', {players: players});
 
+  socket.emit('getInitialData', {numOfPlayers: len(players)});
+
   // invoke the playerJoined event to all other socket
   socket.broadcast.emit('playerJoined', {player: newPlayer});
 }

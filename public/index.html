@@ -7,7 +7,6 @@
     <!-- Imports -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://aframe.io/releases/1.1.0/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-environment-component@1.1.0/dist/aframe-environment-component.min.js"></script>
   </head>
   <body>
     <!-- socket.io script -->
@@ -22,7 +21,8 @@
       }
 
       // emitted when the player connects
-      socket.on('connect', () => {
+      socket.on('getInitialData', (data) => {
+
       });
 
       // emitted to update the position of all players on the client
@@ -81,6 +81,22 @@
           .clone();
       }
 
+      // check if an element has moved the desired amount
+      const hasMovedAmount = (element, lastPosition, amount) => {
+        return lastPosition.distanceTo(getPosition(element)) >= amount;
+      }
+
+      // check if an element has rotated the desired amount
+      const hasRotatedAmount = (element, lastRotation, amount) => {
+        return Math.abs(THREE.MathUtils.radToDeg(
+          lastRotation.angleTo(getRotation(element)))) >= amount
+      }
+
+      // for linear interpolation between two values
+      const lerp = (start, end, amount) => {
+        return (1-amount) * start + amount * end;
+      }
+
       // The Player component
       AFRAME.registerComponent('player', {
         schema: {
@@ -98,9 +114,21 @@
         tick: function() {
           var newPosition = getPosition(this.ship);
           var newRotation = getRotation(this.ship);
+          var shouldEmit  = false;
 
           // check if the player has moved more than the threshold amount
-          if (this.hasMoved(newPosition) || this.hasRotated(newRotation)) {
+          if (hasMovedAmount(this.ship, this.lastPosition, this.data.moveThreshold)) {
+            // update the last position
+            this.lastPosition = newPosition;
+            shouldEmit = true;
+
+          } else if (hasRotatedAmount(this.ship, this.lastRotation, this.data.rotationThreshold)) {
+            // update the last rotation
+            this.lastRotation = newRotation;
+            shouldEmit = true;
+          }
+
+          if (shouldEmit) {
             // emit a moved event to the server with the new position
             socket.emit('moved', {
               newPosition:
@@ -109,35 +137,9 @@
               {x: newRotation.x, y: newRotation.y, z: newRotation.z,
                 w: newRotation.w}});
           }
-        },
-
-        hasMoved: function(newPosition) {
-          // check if the player has moved more than the threshold
-          if (this.lastPosition.distanceTo(newPosition) >
-            this.data.moveThreshold)
-          {
-            // console.log('Moved!');
-            this.lastPosition = newPosition;
-            return true;
-          } else {
-            return false;
-          }
-        },
-
-        hasRotated: function(newRotation) {
-          // check if the player has rotated more than the threshold
-          if (Math.abs(
-            THREE.MathUtils.radToDeg(this.lastRotation.angleTo(newRotation))) >
-            this.data.rotationThreshold)
-          {
-            // console.log('Rotated!');
-            this.lastRotation = newRotation;
-            return true;
-          } else {
-            return false;
-          }
         }
       });
+
 
       // The PlayerController component
       AFRAME.registerComponent('players-controller', {
@@ -226,12 +228,29 @@
           color: {type: 'color', default: 'blue'}
         },
         init: function () {
-          this.el.setAttribute('geometry', {
-            primitive: 'cone',
-            radiusBottom: 0.7,
-            radiusTop: 0.1,
-            height: 1.5
-          });
+
+          // color='#2d5aae'
+          // radius-bottom='0.7'
+          // radius-top='0.1'
+          // height='1.5'
+          // rotation='-90 0 0'
+
+          // create the geometry
+          var geometry = document.createElement('a-cone');
+          geometry.setAttribute('radius-bottom', '0.7');
+          geometry.setAttribute('radius-top', '0.1');
+          geometry.setAttribute('height', '1.5');
+          geometry.setAttribute('color', this.data.color);
+          // geometry.setAttribute('rotation', '-90 0 0');
+          this.el.appendChild(geometry);
+
+          this.el.setAttribute('trail', '');
+          // this.el.setAttribute('geometry', {
+          //   primitive: 'cone',
+          //   radiusBottom: 0.7,
+          //   radiusTop: 0.1,
+          //   height: 1.5
+          // });
           this.el.setAttribute('rotation', {
             x: -90,
             y: 0,
@@ -261,6 +280,100 @@
           });
         }
       });
+
+      AFRAME.registerComponent('trail', {
+        schema: {
+          moveMin: {type: 'number', default: 0.2},
+          color: {type: 'color', default: 'blue'}
+        },
+        init: function () {
+          // set the trail parent
+          this.trailParent = document.querySelector('#trail-particles');
+
+          // set the last position as the target's current position
+          this.lastPosition = getPosition(this.el);
+        },
+
+        tick: function (time) {
+          // check if this element has moved enough
+          if (hasMovedAmount(this.el, this.lastPosition, this.data.moveMin)) {
+            // update the last position
+            this.lastPosition = getPosition(this.el);
+
+            // spawn a trailParticle
+            var newParticleEl = document.createElement('a-entity');
+            newParticleEl.setAttribute('trail-particle', {
+              position: getPosition(this.el)
+            });
+            this.trailParent.appendChild(newParticleEl);
+          }
+        }
+      });
+
+      AFRAME.registerComponent('trail-particle', {
+        schema: {
+          position: {type: 'vec3'},
+          scale: {type: 'number', default: 0.4},
+          lifespan: {type: 'number', default: 3000},
+          startColor: {type: 'color', default: 'blue'},
+          endColor: {type: 'color', default: 'white'}
+        },
+
+        init: function () {
+          // set birthtime to -1 so that the first tick changes it
+          this.birthTime = -1;
+
+          // move the particle to the target's position
+          this.el.setAttribute('position', {
+            x: this.data.position.x,
+            y: this.data.position.y,
+            z: this.data.position.z
+          });
+
+          // create the mesh and material
+          this.el.setAttribute('geometry', {
+            primitive: 'sphere',
+            radius: this.data.scale
+          });
+
+          this.el.setAttribute('material', {
+            shader: "flat",
+            opacity: 0.8,
+            transparent: true,
+            color: this.data.startColor
+          });
+        },
+
+        tick: function (time) {
+          // if this is the first tick, set birthtime
+          if (this.birthTime == -1) {
+            this.birthTime = time;
+          }
+
+          // calculate how long the particle has been alive and time remaining
+          var timeAlive = time - this.birthTime;
+          var timeLeft  = this.data.lifespan - timeAlive;
+
+          // check if the particle has exceeded it's lifespan
+          if (timeLeft <= 0) {
+            // console.log("Particle expired!");
+
+            // destroy this entity
+            this.el.parentNode.removeChild(this.el);
+
+          } else {
+            // calculate the life val (percentage of time left)
+            var lifeVal = lerp(0, 1, timeLeft / this.data.lifespan);
+
+            // update the element's scale and colour
+            this.el.object3D.scale.set(lifeVal, lifeVal, lifeVal);
+            this.el.setAttribute('material', {
+              color: new THREE.Color(this.data.endColor).lerp(
+                new THREE.Color(this.data.startColor), lifeVal)
+            });
+          }
+        }
+      });
     </script>
 
     <a-scene>
@@ -272,18 +385,23 @@
 
       <a-sky src='#space'></a-sky>
 
-      <a-entity wasd-controls='fly:true' look-controls player>
+      <a-entity id="trail-particles">
+      </a-entity>
+
+      <a-entity player wasd-controls='fly:true' look-controls>
         <a-cone class='ship'
           color='#2d5aae'
           radius-bottom='0.7'
           radius-top='0.1'
           height='1.5'
           rotation='-90 0 0'
-        ></a-cone>
+        >
+          <a-entity trail position="0 -1 0"></a-entity>
+        </a-cone>
         <a-entity camera position='0 2 5'></a-entity>
       </a-entity>
+
       <a-entity players-controller></a-entity>
-      <!-- <a-entity environment='ground: none; skyType: none'></a-entity> -->
     </a-scene>
   </body>
 </html>
