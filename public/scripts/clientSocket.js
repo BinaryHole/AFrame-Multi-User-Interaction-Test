@@ -1,10 +1,8 @@
-var name = '';
 const socket = io({transports: ['websocket'], upgrade: false});
 
-// called when the player changes their name
-setName = (data) => {
-  name = data.newName;
-  socket.emit('setName', {name: data.newName});
+// to be called when this client joins the game
+const joinGame = (playerName, playerTeam) => {
+  socket.emit('joinGame', {name: playerName, team: playerTeam});
 }
 
 // emitted when the player connects
@@ -48,5 +46,5 @@ socket.on('playerJoined', (data) => {
 // emitted to remove a player on the client side
 socket.on('playerQuit', (data) => {
   document.querySelector('[players-controller]').emit(
-    'removePlayer', {playerId: data.playerId});
+    'removePlayer', {player: data.player});
 });

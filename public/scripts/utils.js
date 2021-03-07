@@ -1,3 +1,9 @@
+// team enums
+var Team = {
+  RED: 'red',
+  BLUE: 'blue'
+}
+
 // Creates a random hex color
 const randomColor = () => {
   return('#' + Math.floor(Math.random() * 16777215).toString(16));

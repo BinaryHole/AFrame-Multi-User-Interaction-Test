@@ -2,45 +2,20 @@
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8">
-    <title>AFrame Multiplayer Experience</title>
+    <title>Interplanetary Duel League</title>
 
     <!-- Library Imports -->
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://aframe.io/releases/1.1.0/aframe.min.js"></script>
-
-    <!-- Script Imports -->
-    <script src="./scripts/clientSocket.js"></script>
-    <script src="./scripts/components.js"></script>
-    <script src="./scripts/utils.js"></script>
+    <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+    <link href="./styles/index.css" rel="stylesheet">
   </head>
-  <body>
-    <a-scene>
-      <a-assets>
-        <a-asset-item id='spaceship' src='/assets/DS3_A3_Spaceship.glb'>
-        </a-asset-item>
-        <img id='space' src='/assets/hdri.png'></img>
-      </a-assets>
-
-      <a-sky src='#space'></a-sky>
-
-      <a-entity id="trail-particles">
-      </a-entity>
-
-      <a-entity player wasd-controls='fly:true'
-                look-controls="pointerLockEnabled: true">
-        <a-cone class='ship'
-                color='#2d5aae'
-                radius-bottom='0.7'
-                radius-top='0.1'
-                height='1.5'
-                rotation='-90 0 0'
-        >
-          <a-entity trail position="0 -1 0"></a-entity>
-        </a-cone>
-        <a-entity camera position='0 2 5'></a-entity>
-      </a-entity>
-
-      <a-entity players-controller></a-entity>
-    </a-scene>
+  <body style="background-color:black; color:white;">
+    <h1>The Interplanetary Duel League welcomes you.</h1>
+    <form action="/ingame.html">
+      <h2>What is your name, Pilot?</h2>
+      <input id="nameInput" name="name" required placeholder="My name is...">
+      <input type="submit" name="red" value="Join Red">
+      <input type="submit" name="blue" value="Join Blue">
+    </form>
   </body>
 </html>

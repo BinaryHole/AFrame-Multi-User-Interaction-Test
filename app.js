@@ -20,12 +20,14 @@ var players = [];
 // set up socket.io session
 io.on('connection', socket => {
 
-  // when the client connects
-  onConnect(socket);
+  // when the client joins the game
+  socket.on('joinGame', (data) => {
+    onJoin(socket, data);
+  });
 
-  // when the client disconnects
+  // when the client quits
   socket.on('disconnect', (reason) => {
-    onDisconnect(socket);
+    onQuit(socket.id);
   });
 
   // when the player moves or rotates
@@ -57,11 +59,12 @@ const getPlayerIndex = (id) => {
 }
 
 // called when a new client connects
-const onConnect = (socket) => {
+const onJoin = (socket, playerData) => {
   // create the new player object
   var newPlayer = {
     id: socket.id,
-    name: '',
+    name: playerData.name,
+    team: playerData.team,
     position: {x:0, y:0, z:0},
     rotation: {x:0, y:0, z:0, w:0}
   };
@@ -77,27 +80,27 @@ const onConnect = (socket) => {
   // invoke the spawnInitialPlayers event this socket
   socket.emit('spawnInitialPlayers', {players: players});
 
-  socket.emit('getInitialData', {numOfPlayers: len(players)});
+  socket.emit('getInitialData', {numOfPlayers: players.length});
 
   // invoke the playerJoined event to all other socket
   socket.broadcast.emit('playerJoined', {player: newPlayer});
 }
 
 // called when a client disconnects
-const onDisconnect = (socket) => {
-  // remove the client's id from the list of connections
+const onQuit = (id) => {
+  // remove the client's id from the list of players
   for (var i = 0; i < players.length; i++) {
-    if (players[i].id == socket.id) {
+    if (players[i].id == id) {
+      // invoke the usersChanged event
+      io.emit('playerQuit', {player: players[i]});
+
       // remove the player from the list of players
       players.splice(i, 1);
 
       // log which player was removed and the list of players left
-      console.log('Connection ' + socket.id + ' removed. \t# of connections: '
+      console.log('Connection ' + id + ' removed. \t# of connections: '
         + players.length);
       console.log(players);
-
-      // invoke the usersChanged event
-      io.emit('playerQuit', {playerId: socket.id});
     }
   }
 }

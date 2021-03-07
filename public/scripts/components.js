@@ -2,14 +2,38 @@
 AFRAME.registerComponent('player', {
   schema: {
     moveThreshold: {type:'number', default: 0.1},
-    rotationThreshold: {type: 'number', default: 0.1}
+    rotationThreshold: {type: 'number', default: 0.1},
+    team: {type: 'string', default: 'green'}
   },
+
   init: function() {
     this.ship = this.el.querySelector('.ship');
 
     // set up initial vars
     this.lastPosition = getPosition(this.ship);
     this.lastRotation = getRotation(this.ship);
+
+    // set the initial colour of the player to pink to tell if it doesn't get
+    // updated correctly
+    this.setTeam(_PLAYERTEAM);
+
+    // set up an event for setting the team of the player (to be emitted when
+    // the client player joins)
+    this.el.addEventListener('setTeam', function (data) {
+      console.log('setting player team to ' + data.team);
+
+      this.setTeam(data.team);
+    });
+  },
+
+  setTeam: function(team) {
+    // update the team and color of the player
+    this.data.team = team;
+    this.ship.setAttribute('color', this.data.team);
+
+    // set the colour of the player's trail
+    this.el.querySelector('[trail]')
+      .setAttribute('trail', {color: this.data.team})
   },
 
   tick: function() {
@@ -82,7 +106,8 @@ AFRAME.registerComponent('players-controller', {
 
       // setup the attributes of the new player element
       playerEl.setAttribute('other-player', {
-        name: data.detail.player.name
+        name: data.detail.player.name,
+        team: data.detail.player.team
       });
       playerEl.setAttribute('id', data.detail.player.id);
       playerEl.setAttribute('position', data.detail.player.position);
@@ -94,7 +119,8 @@ AFRAME.registerComponent('players-controller', {
         data.detail.player.rotation.w
       )
 
-      console.log('Player ' + playerEl.getAttribute('id') + ' added.');
+      console.log('Player ' + data.detail.player.id
+        + ' (' + data.detail.player.name + ') joined.');
 
       // append the new player element to the players-controller element
       el.appendChild(playerEl);
@@ -108,10 +134,10 @@ AFRAME.registerComponent('players-controller', {
       for (let i = 0; i < spawnedPlayers.length; i++) {
         // check if the current spawned player should be removed (by id)
         if (spawnedPlayers[i].getAttribute('id') ==
-          data.detail.playerId)
+          data.detail.player.id)
         {
           console.log('Player ' + spawnedPlayers[i].getAttribute('id')
-            + ' removed.');
+            + ' (' + data.detail.player.name + ') quit.');
 
           // remove the spawned player
           spawnedPlayers[i].parentNode.removeChild(spawnedPlayers[i]);
@@ -124,27 +150,22 @@ AFRAME.registerComponent('players-controller', {
 // the OtherPlayer component
 AFRAME.registerComponent('other-player', {
   schema: {
-    name: {type: 'string', default: ''},
-    color: {type: 'color', default: 'blue'}
+    name: {type: 'string'},
+    team: {type: 'string'}
   },
   init: function () {
-
-    // color='#2d5aae'
-    // radius-bottom='0.7'
-    // radius-top='0.1'
-    // height='1.5'
-    // rotation='-90 0 0'
-
     // create the geometry
     var geometry = document.createElement('a-cone');
     geometry.setAttribute('radius-bottom', '0.7');
     geometry.setAttribute('radius-top', '0.1');
     geometry.setAttribute('height', '1.5');
-    geometry.setAttribute('color', this.data.color);
-    // geometry.setAttribute('rotation', '-90 0 0');
+
+    // set the colour of this player according to their team
+    geometry.setAttribute('color', this.data.team);
+
     this.el.appendChild(geometry);
 
-    this.el.setAttribute('trail', '');
+    this.el.setAttribute('trail', {color: this.data.team});
     // this.el.setAttribute('geometry', {
     //   primitive: 'cone',
     //   radiusBottom: 0.7,
@@ -184,7 +205,7 @@ AFRAME.registerComponent('modify-material', {
 AFRAME.registerComponent('trail', {
   schema: {
     moveMin: {type: 'number', default: 0.2},
-    color: {type: 'color', default: 'blue'}
+    color: {type: 'color', default: 'green'}
   },
   init: function () {
     // set the trail parent
@@ -203,7 +224,8 @@ AFRAME.registerComponent('trail', {
       // spawn a trailParticle
       var newParticleEl = document.createElement('a-entity');
       newParticleEl.setAttribute('trail-particle', {
-        position: getPosition(this.el)
+        position: getPosition(this.el),
+        startColor: this.data.color
       });
       this.trailParent.appendChild(newParticleEl);
     }
@@ -215,7 +237,7 @@ AFRAME.registerComponent('trail-particle', {
     position: {type: 'vec3'},
     scale: {type: 'number', default: 0.4},
     lifespan: {type: 'number', default: 3000},
-    startColor: {type: 'color', default: 'blue'},
+    startColor: {type: 'color', default: 'green'},
     endColor: {type: 'color', default: 'white'}
   },
 
