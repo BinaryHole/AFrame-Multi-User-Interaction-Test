@@ -84,7 +84,7 @@ AFRAME.registerComponent('players-controller', {
           spawnedPlayers[i].setAttribute('position',
             data.detail.player.position);
 
-          // update the rotatino of the player
+          // update the rotation of the player
           spawnedPlayers[i].object3D.quaternion.set(
             data.detail.player.rotation.x,
             data.detail.player.rotation.y,
@@ -92,10 +92,7 @@ AFRAME.registerComponent('players-controller', {
             data.detail.player.rotation.w
           )
 
-          // update the other-player data of the player
-          spawnedPlayers[i].setAttribute('other-player', {
-            name: data.detail.player.name
-          });
+          // console.log(spawnedPlayers[i].object3D.quaternion);
         }
       }
     });
@@ -112,15 +109,10 @@ AFRAME.registerComponent('players-controller', {
       playerEl.setAttribute('id', data.detail.player.id);
       playerEl.setAttribute('position', data.detail.player.position);
 
-      playerEl.object3D.quaternion.set(
-        data.detail.player.rotation.x,
-        data.detail.player.rotation.y,
-        data.detail.player.rotation.z,
-        data.detail.player.rotation.w
-      )
+      console.log(data.detail.player);
 
-      console.log('Player ' + data.detail.player.id
-        + ' (' + data.detail.player.name + ') joined.');
+      console.log(data.detail.player.name + ' (' + data.detail.player.id
+        + ') joined.');
 
       // append the new player element to the players-controller element
       el.appendChild(playerEl);
@@ -136,8 +128,8 @@ AFRAME.registerComponent('players-controller', {
         if (spawnedPlayers[i].getAttribute('id') ==
           data.detail.player.id)
         {
-          console.log('Player ' + spawnedPlayers[i].getAttribute('id')
-            + ' (' + data.detail.player.name + ') quit.');
+          console.log(data.detail.player.name + ' (' + data.detail.player.id
+            + ') quit.');
 
           // remove the spawned player
           spawnedPlayers[i].parentNode.removeChild(spawnedPlayers[i]);
@@ -165,13 +157,28 @@ AFRAME.registerComponent('other-player', {
 
     this.el.appendChild(geometry);
 
+    // create the name
+    var nameText = document.createElement('a-entity');
+    nameText.setAttribute('position', '0 0 1.5');
+    nameText.setAttribute('rotation', '-90 180 0')
+    nameText.setAttribute('text', {
+      value: this.data.name,
+      align: 'center',
+      width: 20
+    });
+    var nameText2 = document.createElement('a-entity');
+    nameText2.setAttribute('position', '0 0 1.5');
+    nameText2.setAttribute('rotation', '90 0 0')
+    nameText2.setAttribute('text', {
+      value: this.data.name,
+      align: 'center',
+      width: 20
+    });
+
+    this.el.appendChild(nameText);
+    this.el.appendChild(nameText2);
+
     this.el.setAttribute('trail', {color: this.data.team});
-    // this.el.setAttribute('geometry', {
-    //   primitive: 'cone',
-    //   radiusBottom: 0.7,
-    //   radiusTop: 0.1,
-    //   height: 1.5
-    // });
     this.el.setAttribute('rotation', {
       x: -90,
       y: 0,
