@@ -31,6 +31,10 @@ AFRAME.registerComponent('player', {
     this.data.team = team;
     this.ship.setAttribute('color', this.data.team);
 
+    // update the bullet team
+    AFRAME.utils.entity.setComponentProperty(
+      this.ship, 'shooter.team', this.data.team);
+
     // set the colour of the player's trail
     this.el.querySelector('[trail]')
       .setAttribute('trail', {color: this.data.team})
@@ -109,8 +113,6 @@ AFRAME.registerComponent('players-controller', {
       playerEl.setAttribute('id', data.detail.player.id);
       playerEl.setAttribute('position', data.detail.player.position);
 
-      console.log(data.detail.player);
-
       console.log(data.detail.player.name + ' (' + data.detail.player.id
         + ') joined.');
 
@@ -178,41 +180,155 @@ AFRAME.registerComponent('other-player', {
     this.el.appendChild(nameText);
     this.el.appendChild(nameText2);
 
-    this.el.setAttribute('trail', {color: this.data.team});
+    this.el.setAttribute('trail', {
+      color: this.data.team,
+      sound: '#trailSound'
+    });
     this.el.setAttribute('rotation', {
       x: -90,
       y: 0,
       z: 0
-    })
+    });
     this.el.setAttribute('material', {
       color: this.data.color
     });
   }
 });
 
-// used to modify the material of a model/mesh
-AFRAME.registerComponent('modify-material', {
+// the shooter component
+AFRAME.registerComponent('shooter', {
   schema: {
-    color: {type: 'color', default: '#fff'}
+    directionTarget: {type: 'string'},
+    shotDelay: {default: 700},
+    speed: {default: 1},
+    shooterId: {default: 0},
+    shotLifespan: {default: 2000},
+    team: {type: 'color'}
   },
-  init: function () {
-    this.el.addEventListener('model-loaded', () => {
-      // get the mesh
-      const obj = this.el.getObject3D('mesh');
 
-      // change the material color
-      obj.traverse(node => {
-        console.log(this.data.color);
-        node.material.color.set(this.data.color);
+  init: function () {
+    // set up the last shot time
+    this.lastShotTime = 0;
+  },
+
+  tick: function (time) {
+    // if the mouse is being pressed
+    if (_mouseDown && (time - this.lastShotTime) >= this.data.shotDelay) {
+      console.log('Shot fired!');
+
+      // get the direction target
+      var directionTarget = document.querySelector(this.data.directionTarget);
+
+      // get the direction of the shot
+      var shotDirection = new THREE.Euler().setFromQuaternion(
+          getRotation(this.el)).toVector3();
+
+      // create a new shot
+      socket.emit('shoot', {
+        shooterId: this.data.shooterId,
+        position: getPosition(this.el),
+        direction: shotDirection,
+        speed: this.data.speed,
+        // birthTime: time,
+        lifespan: this.data.shotLifespan
       });
+
+      // update lastShotTime
+      this.lastShotTime = time;
+    }
+  }
+});
+
+AFRAME.registerComponent('bullet', {
+  schema: {
+    startPos: {type: 'vec3'},
+    // birthTime: {type: 'number', default: 0},
+    direction: {type: 'vec3'},
+    lifespan: {default: 2000},
+    speed: {default: 1},
+    scale: {default: 0.25},
+    team: {default: 'green'}
+  },
+
+  init: function () {
+    this.birthTime = document.querySelector('a-scene').time;
+
+    // set the bullet parent
+    this.bulletParent = document.querySelector('#bullets');
+
+    // create the mesh and material
+    this.el.setAttribute('geometry', {
+      primitive: 'sphere',
+      radius: this.data.scale
     });
+
+    this.el.setAttribute('material', {
+      color: this.data.team
+    });
+
+    // move the bullet to it's starting position
+    this.el.setAttribute('position', {
+      x: this.data.startPos.x,
+      y: this.data.startPos.y,
+      z: this.data.startPos.z
+    });
+
+    // add the trail component to the bullet
+    this.el.setAttribute('trail', {
+      color: this.data.team,
+      scale: 0.1,
+      moveMin: 0.6,
+      lifespan: 1500
+    });
+  },
+
+  tick: function (time) {
+    // calculate how long the bullet has been alive and time remaining
+    var timeAlive = time - this.birthTime;
+    var timeLeft  = this.data.lifespan - timeAlive;
+
+    // console.log(`birthTime: ${this.birthTime}\ntimeAlive: ${timeAlive}\ntimeLeft: ${timeLeft}`);
+
+    // check if the bullet has expired
+    if (timeLeft <= 0) {
+      // destroy the bullet
+      this.el.parentNode.removeChild(this.el);
+    } else {
+      // get the start pos as a THREE.Vector3
+      var startPos = new THREE.Vector3().set(
+        this.data.startPos.x,
+        this.data.startPos.y,
+        this.data.startPos.z
+      );
+
+      // get the direction as a THREE Vector3
+      var direction = new THREE.Euler(
+        this.data.direction.x,
+        this.data.direction.y,
+        this.data.direction.z
+      );
+      directionVec = new THREE.Vector3(0,1,0);
+      directionVec.applyEuler(direction);
+
+      // set the bullet's position according to it's lifespan
+      var newPos = startPos.add(directionVec
+        .multiplyScalar(this.data.speed * (timeAlive/1000)));
+
+      this.el.setAttribute('position', {
+        x: newPos.x,
+        y: newPos.y,
+        z: newPos.z
+      })
+    }
   }
 });
 
 AFRAME.registerComponent('trail', {
   schema: {
     moveMin: {type: 'number', default: 0.2},
-    color: {type: 'color', default: 'green'}
+    color: {type: 'color', default: 'green'},
+    scale: {default: 0.4},
+    lifespan: {default: 3000},
   },
   init: function () {
     // set the trail parent
@@ -232,7 +348,9 @@ AFRAME.registerComponent('trail', {
       var newParticleEl = document.createElement('a-entity');
       newParticleEl.setAttribute('trail-particle', {
         position: getPosition(this.el),
-        startColor: this.data.color
+        startColor: this.data.color,
+        scale: this.data.scale,
+        lifespan: this.data.lifespan
       });
       this.trailParent.appendChild(newParticleEl);
     }

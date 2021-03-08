@@ -1,3 +1,5 @@
+const THREE = require('three');
+
 const express = require('express');
 const app     = express();
 const http    = require('http');
@@ -16,6 +18,9 @@ app.get('/', (req, res) => {
 
 // keep track of connections
 var players = [];
+
+// keep track of shots
+var shots = [];
 
 // set up socket.io session
 io.on('connection', socket => {
@@ -45,6 +50,25 @@ io.on('connection', socket => {
 
     // emit the updatePlayers socket event
     socket.broadcast.emit('updatePlayers', {players: players});
+  });
+
+  // when the client shoots
+  socket.on('shoot', (data) => {
+    // create the new shot
+    var newShot = {
+      shooterId: data.shooterId,
+      position: data.position,
+      direction: data.direction,
+      speed: data.speed,
+      // birthTime: data.birthTime,
+      lifespan: data.lifespan
+    };
+
+    // add the shot to the list of shots
+    shots.push(newShot);
+
+    // emit the shotMade event to all clients (including this one)
+    io.emit('shotMade', {shot: newShot});
   });
 });
 
@@ -80,7 +104,10 @@ const onJoin = (socket, playerData) => {
   // invoke the spawnInitialPlayers event this socket
   socket.emit('spawnInitialPlayers', {players: players});
 
-  socket.emit('getInitialData', {numOfPlayers: players.length});
+  socket.emit('getInitialData', {
+    numOfPlayers: players.length,
+    clock: _serverTime
+  });
 
   // invoke the playerJoined event to all other socket
   socket.broadcast.emit('playerJoined', {player: newPlayer});

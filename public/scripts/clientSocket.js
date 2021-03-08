@@ -7,7 +7,24 @@ const joinGame = (playerName, playerTeam) => {
 
 // emitted when the player connects
 socket.on('getInitialData', (data) => {
+});
 
+// emitted when a new shot was made
+socket.on('shotMade', (data) => {
+  // create a new bullet
+  var bullet = document.createElement('a-entity');
+
+  bullet.setAttribute('bullet', {
+    // birthTime: data.shot.birthTime,
+    lifespan: data.shot.lifespan,
+    team: data.shot.team,
+    speed: data.shot.speed,
+    direction: data.shot.direction,
+    startPos: data.shot.position
+  });
+
+  // add the bullet to the bullets holder element
+  document.querySelector('#bullets').appendChild(bullet);
 });
 
 // emitted to update the position of all players on the client

@@ -4,6 +4,18 @@ var Team = {
   BLUE: 'blue'
 }
 
+// used for keeping time synchronized with the server
+var _clock = null;
+
+// used for checking if the mouse is pressed or not
+var _mouseDown = false;
+const mouseDown = () => {
+  _mouseDown = true;
+}
+const mouseUp = () => {
+  _mouseDown = false;
+}
+
 // Creates a random hex color
 const randomColor = () => {
   return('#' + Math.floor(Math.random() * 16777215).toString(16));
@@ -29,7 +41,7 @@ const hasMovedAmount = (element, lastPosition, amount) => {
 // check if an element has rotated the desired amount
 const hasRotatedAmount = (element, lastRotation, amount) => {
   return Math.abs(THREE.MathUtils.radToDeg(
-    lastRotation.angleTo(getRotation(element)))) >= amount
+    lastRotation.angleTo(getRotation(element)))) >= amount;
 }
 
 // for linear interpolation between two values

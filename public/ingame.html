@@ -16,7 +16,7 @@
   <script src="./scripts/components.js"></script>
   <script src="./scripts/utils.js"></script>
 </head>
-<body>
+<body onmousedown="mouseDown()" onmouseup="mouseUp()">
   <script>
     // set up the player's default team to be green to tell if it doesn't get
     // updated correctly
@@ -46,28 +46,30 @@
 
   <a-scene>
     <a-assets>
-      <a-asset-item id='spaceship' src='/assets/DS3_A3_Spaceship.glb'>
+      <a-asset-item id="spaceship" src="/assets/DS3_A3_Spaceship.glb">
       </a-asset-item>
-      <img id='space' src='/assets/hdri.png'></img>
+      <audio id="trailSound" src="/assets/trailSound.wav" preload="auto"></audio>
+      <img id="space" src="/assets/hdri.png">
     </a-assets>
 
-    <a-sky src='#space'></a-sky>
+    <a-sky src="#space"></a-sky>
 
-    <a-entity id="trail-particles">
-    </a-entity>
+    <a-entity id="trail-particles"></a-entity>
+    <a-entity id="bullets"></a-entity>
 
-    <a-entity player wasd-controls='fly:true'
+    <a-entity class="player" player wasd-controls="fly:true"
               look-controls="pointerLockEnabled: true">
-      <a-cone class='ship'
-              color='#2d5aae'
-              radius-bottom='0.7'
-              radius-top='0.1'
-              height='1.5'
-              rotation='-90 0 0'
+      <a-cone class="ship"
+              color="#2d5aae"
+              radius-bottom="0.7"
+              radius-top="0.1"
+              height="1.5"
+              rotation="-90 0 0"
+              shooter="directionTarget: .player; speed: 35"
       >
         <a-entity trail position="0 -1 0"></a-entity>
       </a-cone>
-      <a-entity camera position='0 2 5'></a-entity>
+      <a-entity camera position="0 2 5"></a-entity>
     </a-entity>
 
     <a-entity players-controller></a-entity>
