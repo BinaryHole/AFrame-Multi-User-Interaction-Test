@@ -22,6 +22,12 @@
     // updated correctly
     var _PLAYERTEAM = 'green';
 
+    // set up the score
+    var Score = {
+      red: 0,
+      blue: 0
+    };
+
     var idx = document.URL.indexOf('?');
     var params = {},
         pairs = document.URL.split('?').pop().split('&');
@@ -44,6 +50,12 @@
     }
   </script>
 
+  <div style="position:absolute; z-index: 9999; color: white;">
+    <h1>Score:</h1>
+    <h3>Red: </h3><h3 style="color:red" id="redScore"></h3>
+    <h3>Blue: </h3><h3 style="color:blue" id="blueScore"></h3>
+  </div>
+
   <a-scene>
     <a-assets>
       <a-asset-item id="spaceship" src="/assets/DS3_A3_Spaceship.glb">
@@ -65,7 +77,7 @@
               radius-top="0.1"
               height="1.5"
               rotation="-90 0 0"
-              shooter="directionTarget: .player; speed: 35"
+              shooter="directionTarget: .player; speed: 50"
       >
         <a-entity trail position="0 -1 0"></a-entity>
       </a-cone>

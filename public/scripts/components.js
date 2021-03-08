@@ -181,8 +181,7 @@ AFRAME.registerComponent('other-player', {
     this.el.appendChild(nameText2);
 
     this.el.setAttribute('trail', {
-      color: this.data.team,
-      sound: '#trailSound'
+      color: this.data.team
     });
     this.el.setAttribute('rotation', {
       x: -90,
@@ -199,7 +198,7 @@ AFRAME.registerComponent('other-player', {
 AFRAME.registerComponent('shooter', {
   schema: {
     directionTarget: {type: 'string'},
-    shotDelay: {default: 700},
+    shotDelay: {default: 800},
     speed: {default: 1},
     shooterId: {default: 0},
     shotLifespan: {default: 2000},
@@ -229,6 +228,7 @@ AFRAME.registerComponent('shooter', {
         position: getPosition(this.el),
         direction: shotDirection,
         speed: this.data.speed,
+        team: this.data.team,
         // birthTime: time,
         lifespan: this.data.shotLifespan
       });
@@ -242,12 +242,12 @@ AFRAME.registerComponent('shooter', {
 AFRAME.registerComponent('bullet', {
   schema: {
     startPos: {type: 'vec3'},
-    // birthTime: {type: 'number', default: 0},
     direction: {type: 'vec3'},
     lifespan: {default: 2000},
     speed: {default: 1},
     scale: {default: 0.25},
-    team: {default: 'green'}
+    team: {default: 'green'},
+    hitRadius: {default: 1.3}
   },
 
   init: function () {
@@ -278,7 +278,7 @@ AFRAME.registerComponent('bullet', {
       color: this.data.team,
       scale: 0.1,
       moveMin: 0.6,
-      lifespan: 1500
+      lifespan: 500
     });
   },
 
@@ -294,6 +294,26 @@ AFRAME.registerComponent('bullet', {
       // destroy the bullet
       this.el.parentNode.removeChild(this.el);
     } else {
+      // check if the bullet has hit the player
+      // get the position of the player
+      var player = document.querySelector('[player]');
+      var playerPos = getPosition(player);
+      var bulletPos = getPosition(this.el);
+      if (playerPos.distanceTo(bulletPos) <= this.data.hitRadius) {
+        // get the player's team
+        var playerTeam = AFRAME.utils.entity
+          .getComponentProperty(player, 'player.team');
+
+        // check if the bullet is from a different team than the player
+        if (this.data.team != playerTeam) {
+          // give a point to the bullet's team
+          socket.emit('getPoint', {team: this.data.team});
+
+          // destroy the bullet
+          this.el.parentNode.removeChild(this.el);
+        }
+      }
+
       // get the start pos as a THREE.Vector3
       var startPos = new THREE.Vector3().set(
         this.data.startPos.x,

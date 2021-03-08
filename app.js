@@ -16,6 +16,12 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/public/index.html');
 });
 
+// keep track of the score
+var score = {
+  red: 0,
+  blue: 0
+}
+
 // keep track of connections
 var players = [];
 
@@ -60,6 +66,7 @@ io.on('connection', socket => {
       position: data.position,
       direction: data.direction,
       speed: data.speed,
+      team: data.team,
       // birthTime: data.birthTime,
       lifespan: data.lifespan
     };
@@ -69,6 +76,19 @@ io.on('connection', socket => {
 
     // emit the shotMade event to all clients (including this one)
     io.emit('shotMade', {shot: newShot});
+  });
+
+  // when the client gets a point
+  socket.on('getPoint', (data) => {
+    // increment the correct team's score
+    if (data.team == 'blue') {
+      score.blue++;
+    } else if (data.team == 'red') {
+      score.red++;
+    }
+
+    // emit the updatescore event
+    io.emit('updateScore', {red: score.red, blue: score.blue});
   });
 });
 
@@ -103,10 +123,10 @@ const onJoin = (socket, playerData) => {
 
   // invoke the spawnInitialPlayers event this socket
   socket.emit('spawnInitialPlayers', {players: players});
-
   socket.emit('getInitialData', {
     numOfPlayers: players.length,
-    clock: _serverTime
+    redScore: score.red,
+    blueScore: score.blue
   });
 
   // invoke the playerJoined event to all other socket

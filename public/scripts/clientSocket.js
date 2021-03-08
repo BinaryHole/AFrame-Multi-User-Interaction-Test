@@ -7,6 +7,8 @@ const joinGame = (playerName, playerTeam) => {
 
 // emitted when the player connects
 socket.on('getInitialData', (data) => {
+  // set the initial score
+  updateScore(data.redScore, data.blueScore);
 });
 
 // emitted when a new shot was made
@@ -25,6 +27,11 @@ socket.on('shotMade', (data) => {
 
   // add the bullet to the bullets holder element
   document.querySelector('#bullets').appendChild(bullet);
+});
+
+// emitted when the score is to be updated
+socket.on('updateScore', (data) => {
+  updateScore(data.red, data.blue);
 });
 
 // emitted to update the position of all players on the client

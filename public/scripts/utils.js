@@ -16,6 +16,12 @@ const mouseUp = () => {
   _mouseDown = false;
 }
 
+// updates the score
+const updateScore = (redScore, blueScore) => {
+  document.querySelector('#redScore').innerHTML=`${redScore}`;
+  document.querySelector('#blueScore').innerHTML=`${blueScore}`;
+}
+
 // Creates a random hex color
 const randomColor = () => {
   return('#' + Math.floor(Math.random() * 16777215).toString(16));
